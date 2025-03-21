@@ -1,0 +1,9 @@
+{
+  "short_name": "Brochure Creator",
+  "name": "Brochure Creator - Super Mario Odyssey Style",
+  "icons": [ ],
+  "start_url": ".",
+  "display": "standalone",
+  "theme_color": "#000000",
+  "background_color": "#ffffff"
+} 

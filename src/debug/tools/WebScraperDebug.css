@@ -1,0 +1,203 @@
+.web-scraper-debug {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    padding: 16px;
+    height: 100%;
+    overflow: hidden;
+    background-color: #1e1e1e;
+    color: #e0e0e0;
+}
+
+.web-scraper-debug.loading {
+    text-align: center;
+    color: #888;
+}
+
+.debug-section {
+    background-color: #2d2d2d;
+    border-radius: 8px;
+    padding: 16px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.debug-section h3 {
+    margin: 0 0 16px 0;
+    color: #4dabf7;
+    font-size: 1.2em;
+}
+
+.debug-section:last-child {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.debug-input-group {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 16px;
+}
+
+.debug-input {
+    flex: 1;
+    padding: 8px 12px;
+    background-color: #1e1e1e;
+    border: 1px solid #444;
+    border-radius: 4px;
+    color: #e0e0e0;
+    font-size: 1em;
+}
+
+.debug-input:focus {
+    outline: none;
+    border-color: #4dabf7;
+}
+
+.debug-button {
+    padding: 8px 16px;
+    background-color: #4dabf7;
+    border: none;
+    border-radius: 4px;
+    color: white;
+    cursor: pointer;
+    font-size: 1em;
+    transition: background-color 0.2s;
+}
+
+.debug-button:hover:not(:disabled) {
+    background-color: #3c96e0;
+}
+
+.debug-button:disabled {
+    background-color: #444;
+    cursor: not-allowed;
+    opacity: 0.7;
+}
+
+.debug-button.select {
+    background-color: #2d2d2d;
+    border: 1px solid #4dabf7;
+    color: #4dabf7;
+}
+
+.debug-button.select:hover:not(:disabled) {
+    background-color: #3d3d3d;
+}
+
+.debug-button.delete {
+    background-color: #ff6b6b;
+}
+
+.debug-button.delete:hover:not(:disabled) {
+    background-color: #e05555;
+}
+
+.debug-error {
+    padding: 12px;
+    background-color: rgba(255, 107, 107, 0.1);
+    border-left: 3px solid #ff6b6b;
+    color: #ff6b6b;
+    border-radius: 4px;
+    margin-top: 16px;
+}
+
+.debug-actions {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 16px;
+}
+
+.locations-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-height: 200px;
+    overflow-y: auto;
+    padding-right: 8px;
+}
+
+.location-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 12px;
+    background-color: #1e1e1e;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.location-item:hover {
+    background-color: #3d3d3d;
+}
+
+.location-item.selected {
+    background-color: rgba(77, 171, 247, 0.1);
+    border: 1px solid #4dabf7;
+}
+
+.location-label {
+    font-weight: 500;
+}
+
+.location-stats {
+    color: #888;
+    font-size: 0.9em;
+}
+
+/* Custom scrollbar styles */
+.locations-list::-webkit-scrollbar {
+    width: 8px;
+}
+
+.locations-list::-webkit-scrollbar-track {
+    background: #1e1e1e;
+}
+
+.locations-list::-webkit-scrollbar-thumb {
+    background: #444;
+    border-radius: 4px;
+}
+
+.locations-list::-webkit-scrollbar-thumb:hover {
+    background: #555;
+}
+
+.no-locations {
+    text-align: center;
+    color: #888;
+    padding: 16px;
+}
+
+.saved-files {
+    margin-top: 16px;
+}
+
+.saved-files h4 {
+    margin-bottom: 8px;
+    color: #fff;
+}
+
+.debug-result {
+    margin-top: 20px;
+    padding: 16px;
+    background-color: #2d2d2d;
+    border-radius: 4px;
+    overflow-x: auto;
+}
+
+.debug-result h4 {
+    margin-top: 0;
+    margin-bottom: 12px;
+    color: #fff;
+}
+
+.debug-result pre {
+    margin: 0;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    color: #e0e0e0;
+    font-family: monospace;
+} 

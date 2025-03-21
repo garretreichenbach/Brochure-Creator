@@ -1,0 +1,14 @@
+{
+    "ignore": [
+        "scrapedata/*",
+        "*.json",
+        "*.md",
+        "*.txt",
+        "*.log"
+    ],
+    "watch": [
+        "server/*",
+        "src/*"
+    ],
+    "ext": "js,jsx,ts,tsx,css,html"
+} 
