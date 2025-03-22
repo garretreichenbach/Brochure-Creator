@@ -1,21 +1,20 @@
-.app {
+.App {
+    text-align: center;
     min-height: 100vh;
-    background-color: #f8f9fa;
-    padding-bottom: 60px;
+    display: flex;
+    flex-direction: column;
+    background-color: #f5f5f5;
 }
 
 .app-header {
-    background-color: #1e1e1e;
-    color: #fff;
-    padding: 40px 20px;
-    text-align: center;
-    margin-bottom: 40px;
+    background-color: #282c34;
+    padding: 20px;
+    color: white;
 }
 
 .app-header h1 {
     margin: 0;
     font-size: 2.5em;
-    font-weight: 700;
 }
 
 .app-header p {
@@ -25,28 +24,31 @@
 }
 
 .app-content {
+    flex: 1;
+    padding: 20px;
     max-width: 1200px;
     margin: 0 auto;
-    padding: 0 20px;
+    width: 100%;
+    box-sizing: border-box;
 }
 
 .location-form {
-    max-width: 600px;
-    margin: 0 auto 40px;
+    margin: 20px 0;
 }
 
 .location-input {
     width: 100%;
-    padding: 16px;
-    font-size: 18px;
+    max-width: 500px;
+    padding: 12px 20px;
+    margin: 8px 0;
+    font-size: 16px;
     border: 2px solid #ddd;
-    border-radius: 8px;
-    background-color: #fff;
-    transition: border-color 0.2s;
+    border-radius: 4px;
+    transition: border-color 0.3s ease;
 }
 
 .location-input:focus {
-    border-color: #0078d4;
+    border-color: #4CAF50;
     outline: none;
 }
 
@@ -55,11 +57,12 @@
 }
 
 .generated-preview {
-    margin-top: 40px;
+    margin-top: 20px;
     padding: 20px;
-    background: #fff;
+    background: white;
     border-radius: 8px;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    text-align: left;
 }
 
 .generated-preview h2 {
@@ -68,10 +71,20 @@
 }
 
 .generated-preview pre {
-    background: #f8f9fa;
-    padding: 20px;
-    border-radius: 4px;
     overflow-x: auto;
-    font-size: 14px;
-    line-height: 1.5;
+    padding: 15px;
+    background: #f8f8f8;
+    border-radius: 4px;
+}
+
+/* Ensure debug panel doesn't interfere with main content */
+.debug-panel {
+    position: fixed;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    z-index: 1000;
+    max-width: 400px;
+    background: white;
+    box-shadow: -2px 0 5px rgba(0,0,0,0.1);
 } 

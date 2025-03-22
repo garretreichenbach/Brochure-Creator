@@ -9,6 +9,7 @@ const stream = require('stream');
 const { promisify } = require('util');
 const pipeline = promisify(stream.pipeline);
 const crypto = require('crypto');
+const logger = require('./utils/debugLogger');
 require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 
 const app = express();
@@ -89,8 +90,8 @@ if (!process.env.GOOGLE_SEARCH_API_KEY || !process.env.GOOGLE_SEARCH_ENGINE_ID) 
 
 // Web search endpoint
 app.post('/api/websearch', async (req, res, next) => {
-    console.log('Handling websearch request');
     try {
+        logger.info('Received web search request', { query: req.body.query });
         console.log('Received search request:', {
             query: req.body.query,
             filters: req.body.filters,
@@ -156,8 +157,10 @@ app.post('/api/websearch', async (req, res, next) => {
         }));
 
         console.log(`Processed ${results.length} search results`);
+        logger.info('Web search completed', { resultsCount: results.length });
         res.json({ results });
     } catch (error) {
+        logger.error('Web search error:', error);
         console.error('Web search error:', {
             message: error.message,
             response: error.response?.data,
@@ -302,14 +305,21 @@ function generateWebsiteId(url, title) {
 async function analyzeContentWithAI(content, url, location, maxRetries = 3) {
     let lastError = null;
     
+    // Ensure content object has required properties with default values
+    const safeContent = {
+        title: content?.title || 'Untitled',
+        description: content?.description || '',
+        mainContent: content?.mainContent || ''
+    };
+    
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
         try {
             const prompt = `Analyze this webpage content about ${location} and structure it into meaningful sections.
 
 Content to analyze:
-Title: ${content.title}
-Description: ${content.description}
-Main Content: ${content.mainContent.substring(0, 5000)} // Limit content length to prevent token overflow
+Title: ${safeContent.title}
+Description: ${safeContent.description}
+Main Content: ${safeContent.mainContent.substring(0, 5000)} // Limit content length to prevent token overflow
 
 URL: ${url}
 
@@ -570,20 +580,17 @@ function normalizeUrl(url, baseUrl) {
 
 // Modify the save endpoint to make location optional for debugging
 app.post('/api/scrape/save', async (req, res) => {
-    let siteDir = null;
     try {
-        const { url, data } = req.body;
-        let { location } = req.body;
-        
+        const { url } = req.body;
+        logger.info('Starting URL scrape', { url });
+
         if (!url) {
             return res.status(400).json({ error: 'Missing url' });
         }
 
         // For debugging purposes, use a default location if not provided
-        if (!location) {
-            location = 'debug';
-            console.log('No location provided, using debug location');
-        }
+        let location = req.body.location || 'debug';
+        console.log('No location provided, using debug location');
 
         // Create safe names for directories
         const safeLocationName = createSafeName(location);
@@ -602,7 +609,7 @@ app.post('/api/scrape/save', async (req, res) => {
         // Get the title and generate a unique website ID
         const title = $('title').text().trim();
         const websiteId = generateWebsiteId(url, title);
-        siteDir = path.join(locationDir, websiteId);
+        const siteDir = path.join(locationDir, websiteId);
         const imagesDir = path.join(siteDir, 'images');
 
         // Extract main content
@@ -708,6 +715,7 @@ app.post('/api/scrape/save', async (req, res) => {
         // After saving the data, update the index
         await updateScrapeIndex(safeLocationName, websiteId, pageData);
 
+        logger.info('URL scrape completed successfully', { url });
         res.json({ 
             message: 'Data and images saved successfully',
             location: safeLocationName,
@@ -718,6 +726,7 @@ app.post('/api/scrape/save', async (req, res) => {
             }
         });
     } catch (error) {
+        logger.error('Scrape error:', error);
         console.error('Error saving scraped data:', error);
         
         // Clean up incomplete scrape
@@ -764,19 +773,26 @@ app.get('/api/scrape/list', async (req, res) => {
 });
 
 // Get specific scraped data
-app.get('/api/scrape/:url', async (req, res) => {
+app.get('/api/scrape/data/:url', async (req, res) => {
     try {
         const encodedUrl = req.params.url;
         const decodedUrl = decodeURIComponent(encodedUrl);
         
+        console.log('Looking for data for URL:', decodedUrl);
+        
         // Load the index
         const index = await loadScrapeIndex();
+        console.log('Found locations:', Object.keys(index.locations));
         
         // Search through all locations for the URL
         for (const [locationName, locationData] of Object.entries(index.locations)) {
+            console.log('Searching in location:', locationName);
             if (locationData.sites) {
                 for (const [siteId, siteData] of Object.entries(locationData.sites)) {
+                    console.log('Checking site:', siteId);
                     if (siteData.url === decodedUrl) {
+                        console.log('Found matching data in:', path.join(scrapedataDir, locationName, siteId));
+                        
                         // Found the site, load its data
                         const dataPath = path.join(scrapedataDir, locationName, siteId, 'data.json');
                         try {
@@ -790,8 +806,36 @@ app.get('/api/scrape/:url', async (req, res) => {
                                     localPath: path.join(scrapedataDir, locationName, siteId, img.localPath)
                                 }));
                             }
-                            
-                            return res.json(data);
+
+                            // If we have content analysis from the LLM, include it
+                            if (data.contentAnalysis) {
+                                console.log('Found content analysis, returning data');
+                                return res.json({
+                                    ...data,
+                                    contentAnalysis: data.contentAnalysis
+                                });
+                            } else {
+                                // If no content analysis exists, generate it
+                                console.log('No content analysis found, generating new analysis');
+                                const contentAnalysis = await analyzeContentWithAI(
+                                    {
+                                        title: data.title,
+                                        description: data.description,
+                                        mainContent: data.mainContent
+                                    },
+                                    decodedUrl,
+                                    locationName
+                                );
+                                
+                                // Update the data with the new analysis
+                                data.contentAnalysis = contentAnalysis;
+                                
+                                // Save the updated data
+                                await fs.writeFile(dataPath, JSON.stringify(data, null, 2));
+                                
+                                console.log('Generated and saved new content analysis');
+                                return res.json(data);
+                            }
                         } catch (error) {
                             console.error(`Error reading data file for ${siteId}:`, error);
                             return res.status(500).json({ error: 'Failed to read site data' });
@@ -801,11 +845,13 @@ app.get('/api/scrape/:url', async (req, res) => {
             }
         }
         
-        // If we get here, the URL wasn't found
-        res.status(404).json({ error: 'Scraped data not found' });
+        // If we get here, we didn't find the URL, and need to scrape it again
+        console.warn('URL not found in scraped data, scraping again:', decodedUrl);
+        
+        return res.status(404).json({ error: 'URL not found in scraped data' });
     } catch (error) {
-        console.error('Error reading scraped data:', error);
-        res.status(500).json({ error: 'Failed to read scraped data' });
+        console.error('Error getting scraped data:', error);
+        res.status(500).json({ error: 'Failed to get scraped data' });
     }
 });
 
@@ -935,6 +981,7 @@ Example format:
 app.post('/api/categorize/image', async (req, res) => {
     try {
         const { image, location, context } = req.body;
+        logger.info('Starting image categorization', { imageUrl: image.url });
 
         // Construct the prompt for image categorization
         const prompt = `Analyze this image and its context for a travel brochure about ${location}.
@@ -1006,9 +1053,13 @@ Example response format:
             throw new Error('Invalid categorization response format');
         }
 
+        logger.info('Image categorization completed', { 
+            imageUrl: image.url,
+            categories: categorization.categories 
+        });
         res.json(categorization);
     } catch (error) {
-        console.error('Error categorizing image:', error);
+        logger.error('Image categorization error:', error);
         res.status(500).json({ error: 'Failed to categorize image' });
     }
 });
@@ -1224,7 +1275,7 @@ app.use((err, req, res, next) => {
 
 // Start server
 app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
+    logger.info(`Server running on port ${PORT}`);
     console.log('Available routes:');
     console.log('- POST /api/websearch');
     console.log('- POST /api/scrape/save');

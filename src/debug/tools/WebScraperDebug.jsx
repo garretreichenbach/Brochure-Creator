@@ -1,9 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
-import { load as cheerioLoad } from 'cheerio';
+import WebScraperService from '../../services/WebScraperService';
+import logger from '../../utils/debugLogger';
 import './WebScraperDebug.css';
-
-const API_BASE_URL = `http://localhost:${process.env.SERVER_PORT || 3003}/api`;
 
 const WebScraperDebug = () => {
     const [url, setUrl] = useState('');
@@ -23,30 +21,21 @@ const WebScraperDebug = () => {
 
     const loadSavedFiles = async () => {
         try {
-            const response = await axios.get(`${API_BASE_URL}/scrape/list`);
-            setSavedFiles(response.data);
+            const files = await WebScraperService.getScrapedUrls();
+            setSavedFiles(files);
         } catch (err) {
-            console.error('Error loading saved files:', err);
+            logger.error('Error loading saved files:', err);
         }
     };
 
     const loadLocations = async () => {
         try {
-            window.dispatchEvent(new CustomEvent('debug-info', { detail: 'Loading scrape locations...' }));
-            const response = await fetch(`${API_BASE_URL}/scrape/locations`);
-            if (!response.ok) {
-                throw new Error(`Failed to load locations: ${response.statusText}`);
-            }
-            const data = await response.json();
-            window.dispatchEvent(new CustomEvent('debug-info', { 
-                detail: {
-                    message: 'Locations loaded successfully',
-                    data: data
-                }
-            }));
+            logger.info('Loading scrape locations...');
+            const data = await WebScraperService.getScrapedLocations();
+            logger.info('Locations loaded successfully', data);
             setLocations(data);
         } catch (err) {
-            window.dispatchEvent(new CustomEvent('debug-error', { detail: `Error loading locations: ${err.message}` }));
+            logger.error('Error loading locations:', err);
             setError(`Error loading locations: ${err.message}`);
         }
     };
@@ -54,45 +43,25 @@ const WebScraperDebug = () => {
     const handleScrape = async () => {
         setLoading(true);
         setError(null);
-        window.dispatchEvent(new CustomEvent('debug-info', { detail: `Starting scrape for URL: ${url}` }));
+        logger.info('Starting scrape', { url });
 
         try {
-            const response = await fetch(`${API_BASE_URL}/scrape/save`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ url }),
-            });
-
-            if (!response.ok) {
-                const errorData = await response.json();
-                window.dispatchEvent(new CustomEvent('debug-error', { detail: `Server error: ${errorData.error}` }));
-                setError(`Server error: ${errorData.error}`);
-                return;
-            }
-
-            const data = await response.json();
-            window.dispatchEvent(new CustomEvent('debug-info', { 
-                detail: {
-                    message: 'Scrape completed successfully',
-                    data: data
-                }
-            }));
+            const result = await WebScraperService.scrapeUrl(url);
+            logger.info('Scrape completed successfully', result);
             loadLocations();
         } catch (err) {
-            window.dispatchEvent(new CustomEvent('debug-error', { detail: `Error during scrape: ${err.message}` }));
+            logger.error('Error during scrape:', err);
             setError(`Error during scrape: ${err.message}`);
         } finally {
             setLoading(false);
         }
     };
 
-    const loadSavedFile = async (filename) => {
+    const loadSavedFile = async (url) => {
         try {
-            const response = await axios.get(`${API_BASE_URL}/scrape/${encodeURIComponent(filename)}`);
-            setSelectedFile(response.data);
-            setResult(JSON.stringify(response.data, null, 2));
+            const data = await WebScraperService.getScrapedData(url);
+            setSelectedFile(data);
+            setResult(JSON.stringify(data, null, 2));
         } catch (err) {
             setError(`Error loading file: ${err.message}`);
         }
@@ -120,28 +89,15 @@ const WebScraperDebug = () => {
         if (!selectedLocations.length) return;
 
         setIsDeleting(true);
-        window.dispatchEvent(new CustomEvent('debug-warn', { 
-            detail: `Deleting locations: ${selectedLocations.join(', ')}`
-        }));
+        logger.warn('Deleting locations', { locations: selectedLocations });
 
         try {
-            const response = await fetch(`${API_BASE_URL}/scrape/delete`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ locations: selectedLocations }),
-            });
-
-            if (!response.ok) {
-                throw new Error(`Failed to delete locations: ${response.statusText}`);
-            }
-
-            window.dispatchEvent(new CustomEvent('debug-info', { detail: 'Locations deleted successfully' }));
+            await WebScraperService.deleteLocations(selectedLocations);
+            logger.info('Locations deleted successfully');
             setSelectedLocations([]);
             loadLocations();
         } catch (err) {
-            window.dispatchEvent(new CustomEvent('debug-error', { detail: `Error deleting locations: ${err.message}` }));
+            logger.error('Error deleting locations:', err);
             setError(`Error deleting locations: ${err.message}`);
         } finally {
             setIsDeleting(false);
@@ -172,43 +128,59 @@ const WebScraperDebug = () => {
             </div>
 
             <div className="debug-section">
-                <h3>Location Manager</h3>
-                <div className="debug-actions">
-                    <button
-                        onClick={handleSelectAll}
-                        className="debug-button select"
-                        disabled={locations.length === 0}
-                    >
-                        {selectedLocations.length === locations.length ? 'Deselect All' : 'Select All'}
-                    </button>
-                    <button
-                        onClick={handleDelete}
-                        className="debug-button delete"
-                        disabled={selectedLocations.length === 0 || isDeleting}
-                    >
-                        {isDeleting ? 'Deleting...' : 'Delete Selected'}
-                    </button>
-                </div>
-                <div className="locations-list">
-                    {locations.map(location => (
-                        <div
-                            key={location.name}
-                            className={`location-item ${selectedLocations.includes(location.name) ? 'selected' : ''}`}
-                            onClick={() => handleLocationSelect(location.name)}
-                        >
-                            <div className="location-label">{location.name}</div>
-                            <div className="location-stats">
-                                {location.sites} sites | {location.totalSize}
-                            </div>
+                <h3>Saved Files</h3>
+                <div className="saved-files-list">
+                    {savedFiles.map((file, index) => (
+                        <div key={index} className="saved-file-item">
+                            <span className="file-title">{file.title}</span>
+                            <button
+                                onClick={() => loadSavedFile(file.url)}
+                                className="debug-button small"
+                            >
+                                Load
+                            </button>
                         </div>
                     ))}
                 </div>
             </div>
 
-            {result && (
+            <div className="debug-section">
+                <h3>Locations</h3>
+                <div className="locations-controls">
+                    <button
+                        onClick={handleSelectAll}
+                        className="debug-button"
+                    >
+                        {selectedLocations.length === locations.length ? 'Deselect All' : 'Select All'}
+                    </button>
+                    <button
+                        onClick={handleDelete}
+                        disabled={isDeleting || !selectedLocations.length}
+                        className="debug-button danger"
+                    >
+                        {isDeleting ? 'Deleting...' : `Delete Selected (${selectedLocations.length})`}
+                    </button>
+                </div>
+                <div className="locations-list">
+                    {locations.map((location, index) => (
+                        <div key={index} className="location-item">
+                            <label>
+                                <input
+                                    type="checkbox"
+                                    checked={selectedLocations.includes(location.name)}
+                                    onChange={() => handleLocationSelect(location.name)}
+                                />
+                                {location.name} ({Object.keys(location.sites || {}).length} sites)
+                            </label>
+                        </div>
+                    ))}
+                </div>
+            </div>
+
+            {selectedFile && (
                 <div className="debug-section">
-                    <h3>Scraped Data</h3>
-                    <pre className="debug-result">{result}</pre>
+                    <h3>File Content</h3>
+                    <pre className="file-content">{result}</pre>
                 </div>
             )}
         </div>

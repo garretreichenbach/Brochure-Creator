@@ -3,6 +3,7 @@ import BrochureService from '../services/BrochureService';
 import SelectedSources from './SelectedSources';
 import './BrochureGenerator.css';
 import axios from 'axios';
+import logger from '../utils/debugLogger';
 
 // Update API URL constant to use PORT instead of REACT_APP_API_URL
 const API_BASE_URL = `http://localhost:${process.env.SERVER_PORT || 3003}`;
@@ -100,13 +101,15 @@ const BrochureGenerator = ({ location, onComplete }) => {
         setSourcesConfirmed(false);
 
         try {
+            logger.info('Starting location search', { location });
             const results = await BrochureService.searchLocation(location);
+            logger.info('Search completed', { resultCount: results.length });
             setSearchResults(results);
             selectBestSources(results);
             setCurrentStep('Found relevant websites');
             setProgress(25);
         } catch (error) {
-            console.error('Error searching:', error);
+            logger.error('Error searching:', error);
             setError(error.message || 'Failed to search for websites');
         } finally {
             setIsGenerating(false);
@@ -122,58 +125,168 @@ const BrochureGenerator = ({ location, onComplete }) => {
 
         setIsGenerating(true);
         setError(null);
-        setProgress(25);
-        setCurrentStep('Scraping selected websites...');
+        setProgress(0);
+        setCurrentStep('Initializing scraping process...');
+        logger.info('Starting brochure generation', { location, selectedUrls });
 
         try {
             // Get the scraped data for each URL
-            const scrapePromises = selectedUrls.map(async (url) => {
+            const totalUrls = selectedUrls.length;
+            const scrapedData = [];
+            
+            // Process each URL sequentially to better track progress
+            for (let i = 0; i < selectedUrls.length; i++) {
+                const url = selectedUrls[i];
                 try {
-                    console.log('Processing URL:', url);
+                    setCurrentStep(`Scraping website ${i + 1} of ${totalUrls}: ${url}`);
+                    setProgress(Math.floor((i / totalUrls) * 50)); // First 50% for scraping
+                    logger.info(`Processing URL ${i + 1}/${totalUrls}`, { url });
+
                     const encodedUrl = encodeURIComponent(url);
-                    console.log('Encoded URL:', encodedUrl);
+                    logger.log('Encoded URL:', encodedUrl);
 
                     // First try to get existing data
                     try {
-                        console.log('Attempting to get existing data');
+                        logger.log('Attempting to get existing data');
                         const response = await axios.get(`${API_BASE_URL}/api/scrape/data/${encodedUrl}`);
-                        console.log('Found existing data');
-                        return response.data;
+                        logger.info('Found existing data', { url });
+                        scrapedData.push(response.data);
                     } catch (error) {
                         if (error.response?.status === 404) {
-                            console.log('No existing data found, will scrape new data');
+                            setCurrentStep(`Scraping new content from ${url}...`);
+                            logger.info('No existing data found, scraping new data', { url });
                             // If data not found, scrape and save it
                             const saveResponse = await axios.post(`${API_BASE_URL}/api/scrape/save`, {
                                 url,
                                 location,
                                 data: {}
                             });
-                            console.log('Save response:', saveResponse.data);
+                            logger.info('Save response received', saveResponse.data);
                             
                             // After saving, get the saved data
                             const savedDataResponse = await axios.get(`${API_BASE_URL}/api/scrape/data/${encodedUrl}`);
-                            console.log('Retrieved saved data');
-                            return savedDataResponse.data;
+                            logger.info('Retrieved saved data', { url });
+                            scrapedData.push(savedDataResponse.data);
                         }
                         throw error; // Re-throw other errors
                     }
                 } catch (error) {
-                    console.error(`Error processing ${url}:`, error);
+                    logger.error(`Error processing ${url}:`, error);
                     if (error.response) {
-                        console.error('Error response:', error.response.data);
+                        logger.error('Error response:', error.response.data);
                     }
                     throw new Error(`Failed to process ${url}: ${error.message}`);
                 }
-            });
+            }
 
-            console.log('Waiting for all scrape promises to resolve');
-            const scrapedData = await Promise.all(scrapePromises);
-            console.log('All scrape promises resolved');
-
-            setProgress(50);
             setCurrentStep('Analyzing and merging content...');
+            setProgress(60);
+            logger.info('Starting content analysis and merge');
 
-            // Merge the scraped data
+            // Process images from the scraped data
+            setCurrentStep('Processing and analyzing images...');
+            setProgress(70);
+            logger.info('Starting image processing');
+
+            const processImages = async (data, currentContext) => {
+                if (!data.images || !Array.isArray(data.images)) return;
+
+                const totalImages = data.images.length;
+                logger.info('Processing images', { totalImages });
+
+                for (let i = 0; i < data.images.length; i++) {
+                    const image = data.images[i];
+                    setCurrentStep(`Analyzing image ${i + 1} of ${totalImages}`);
+                    setProgress(70 + Math.floor((i / totalImages) * 10)); // 70-80% progress
+
+                    // Skip if no URL or tiny images
+                    if (!image.url || (image.width && image.width < 300) || (image.height && image.height < 300)) {
+                        continue;
+                    }
+
+                    // Clean the image object
+                    const cleanedImage = {
+                        url: image.url,
+                        alt: image.alt || '',
+                        title: image.title || '',
+                        width: image.width || 0,
+                        height: image.height || 0,
+                        type: image.type || 'general',
+                        quality: image.quality || 0.5,
+                        caption: image.caption || '',
+                        context: image.surroundingText || ''
+                    };
+
+                    try {
+                        logger.info(`Processing image ${i + 1}/${totalImages}`, { 
+                            url: image.url,
+                            dimensions: `${image.width}x${image.height}`
+                        });
+                        // Get AI categorization for the image
+                        const categorizationResponse = await axios.post(
+                            `${API_BASE_URL}/api/categorize/image`,
+                            {
+                                image: cleanedImage,
+                                location: location,
+                                context: currentContext
+                            }
+                        );
+
+                        const { categories, primaryCategory, isHighQuality, relevanceScore } = categorizationResponse.data;
+
+                        // Update image with AI-generated metadata
+                        const processedImage = {
+                            ...cleanedImage,
+                            categories,
+                            primaryCategory,
+                            isHighQuality,
+                            relevanceScore,
+                            quality: Math.max(cleanedImage.quality, relevanceScore)
+                        };
+
+                        // Add to hero images if it's high quality and primarily a hero shot
+                        if (
+                            processedImage.primaryCategory === 'HERO' &&
+                            processedImage.isHighQuality &&
+                            (processedImage.width >= 1200 || !processedImage.width) &&
+                            (!processedImage.width || processedImage.width / processedImage.height >= 1.5)
+                        ) {
+                            mergedData.images.hero.push(processedImage);
+                        }
+
+                        // Add to attraction images if it shows attractions
+                        if (processedImage.categories.some(cat => 
+                            cat.type === 'ATTRACTION' && cat.confidence > 0.6
+                        )) {
+                            mergedData.images.attractions.push(processedImage);
+                        }
+
+                        // Add to activity images if it shows activities
+                        if (processedImage.categories.some(cat => 
+                            cat.type === 'ACTIVITY' && cat.confidence > 0.6
+                        )) {
+                            mergedData.images.activities.push(processedImage);
+                        }
+
+                        // Add cultural and food images to general category
+                        if (processedImage.categories.some(cat => 
+                            (cat.type === 'CULTURAL' || cat.type === 'FOOD') && 
+                            cat.confidence > 0.6
+                        )) {
+                            mergedData.images.general.push(processedImage);
+                        }
+                    } catch (error) {
+                        logger.error('Error categorizing image:', { error, imageUrl: image.url });
+                        continue; // Skip to the next image if categorization fails
+                    }
+                }
+            };
+
+            // Process each scraped source
+            setCurrentStep('Organizing content...');
+            setProgress(80);
+            logger.info('Starting content organization');
+
             const mergedData = {
                 title: location,
                 description: '',
@@ -201,99 +314,6 @@ const BrochureGenerator = ({ location, onComplete }) => {
                 }
             };
 
-            // Process images from the scraped data
-            const processImages = async (data, currentContext) => {
-                if (!data.images || !Array.isArray(data.images)) return;
-
-                const imagePromises = data.images.map(async (image) => {
-                    // Skip if no URL or tiny images
-                    if (!image.url || (image.width && image.width < 300) || (image.height && image.height < 300)) {
-                        return null;
-                    }
-
-                    // Clean the image object
-                    const cleanedImage = {
-                        url: image.url,
-                        alt: image.alt || '',
-                        title: image.title || '',
-                        width: image.width || 0,
-                        height: image.height || 0,
-                        type: image.type || 'general',
-                        quality: image.quality || 0.5,
-                        caption: image.caption || '',
-                        context: image.surroundingText || ''
-                    };
-
-                    try {
-                        // Get AI categorization for the image
-                        const categorizationResponse = await axios.post(
-                            `${API_BASE_URL}/api/categorize/image`,
-                            {
-                                image: cleanedImage,
-                                location: location,
-                                context: currentContext
-                            }
-                        );
-
-                        const { categories, primaryCategory, isHighQuality, relevanceScore } = categorizationResponse.data;
-
-                        // Update image with AI-generated metadata
-                        return {
-                            ...cleanedImage,
-                            categories,
-                            primaryCategory,
-                            isHighQuality,
-                            relevanceScore,
-                            quality: Math.max(cleanedImage.quality, relevanceScore)
-                        };
-                    } catch (error) {
-                        console.error('Error categorizing image:', error);
-                        return cleanedImage; // Fall back to the original image if categorization fails
-                    }
-                });
-
-                // Wait for all image processing to complete
-                const processedImages = (await Promise.all(imagePromises)).filter(img => img !== null);
-
-                // Categorize images based on AI analysis
-                processedImages.forEach(image => {
-                    if (!image.categories) return;
-
-                    // Add to hero images if it's high quality and primarily a hero shot
-                    if (
-                        image.primaryCategory === 'HERO' &&
-                        image.isHighQuality &&
-                        (image.width >= 1200 || !image.width) &&
-                        (!image.width || image.width / image.height >= 1.5)
-                    ) {
-                        mergedData.images.hero.push(image);
-                    }
-
-                    // Add to attraction images if it shows attractions
-                    if (image.categories.some(cat => 
-                        cat.type === 'ATTRACTION' && cat.confidence > 0.6
-                    )) {
-                        mergedData.images.attractions.push(image);
-                    }
-
-                    // Add to activity images if it shows activities
-                    if (image.categories.some(cat => 
-                        cat.type === 'ACTIVITY' && cat.confidence > 0.6
-                    )) {
-                        mergedData.images.activities.push(image);
-                    }
-
-                    // Add cultural and food images to general category
-                    if (image.categories.some(cat => 
-                        (cat.type === 'CULTURAL' || cat.type === 'FOOD') && 
-                        cat.confidence > 0.6
-                    )) {
-                        mergedData.images.general.push(image);
-                    }
-                });
-            };
-
-            // Process each scraped source
             for (const data of scrapedData) {
                 if (!data.content) continue;
 
@@ -416,8 +436,9 @@ const BrochureGenerator = ({ location, onComplete }) => {
                 general: deduplicateImages(mergedData.images.general).slice(0, 30)
             };
 
-            setProgress(75);
-            setCurrentStep('Generating brochure layout...');
+            setCurrentStep('Generating final brochure layout...');
+            setProgress(90);
+            logger.info('Generating brochure layout');
 
             // Determine the environment type based on content
             const environment = determineEnvironmentType(mergedData.description);
@@ -454,14 +475,18 @@ const BrochureGenerator = ({ location, onComplete }) => {
 
             // Generate the final brochure
             setCurrentStep('Finalizing brochure...');
+            logger.info('Finalizing brochure');
             const brochure = await BrochureService.generateBrochure(mergedData, customizedTemplate);
             setProgress(100);
+
+            setCurrentStep('Brochure generation complete!');
+            logger.info('Brochure generation completed successfully');
 
             if (onComplete) {
                 onComplete(brochure);
             }
         } catch (error) {
-            console.error('Error in handleGenerate:', error);
+            logger.error('Error in handleGenerate:', error);
             setError(error.message || 'Failed to generate brochure');
             setIsGenerating(false);
             setProgress(0);

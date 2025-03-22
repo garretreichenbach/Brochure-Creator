@@ -3,7 +3,7 @@ import BrochureGenerator from './components/BrochureGenerator';
 import DebugPanel from './debug/DebugPanel';
 import './App.css';
 
-const App = () => {
+function App() {
     const [location, setLocation] = useState('');
     const [generatedData, setGeneratedData] = useState(null);
 
@@ -14,11 +14,10 @@ const App = () => {
 
     const handleGenerationComplete = (data) => {
         setGeneratedData(data);
-        // TODO: Add brochure display/preview component
     };
 
     return (
-        <div className="app">
+        <div className="App">
             <header className="app-header">
                 <h1>Brochure Creator</h1>
                 <p>Create custom brochures in Super Mario Odyssey style</p>
@@ -53,6 +52,6 @@ const App = () => {
             {process.env.NODE_ENV === 'development' && <DebugPanel />}
         </div>
     );
-};
+}
 
 export default App; 

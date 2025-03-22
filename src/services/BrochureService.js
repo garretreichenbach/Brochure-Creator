@@ -1,4 +1,6 @@
 import axios from 'axios';
+import logger from '../utils/debugLogger';
+import WebScraperService from './WebScraperService';
 
 const API_BASE_URL = `http://localhost:${process.env.SERVER_PORT || '3003'}/api`;
 
@@ -85,6 +87,7 @@ class BrochureService {
      */
     static async searchLocation(location) {
         try {
+            logger.info('Starting location search', { location });
             const searchQueries = [
                 `${location} travel guide tourism attractions`,
                 `${location} culture history landmarks`,
@@ -95,6 +98,7 @@ class BrochureService {
             
             // Perform multiple searches with different queries
             for (const query of searchQueries) {
+                logger.info('Executing search query', { query });
                 const response = await axios.post(`${API_BASE_URL}/websearch`, {
                     query,
                     maxResults: SEARCH_CONFIG.maxResults,
@@ -106,6 +110,11 @@ class BrochureService {
                 }
             }
 
+            logger.info('Search completed', { 
+                totalResults: allResults.length,
+                queries: searchQueries
+            });
+
             // Deduplicate results based on URL
             const uniqueResults = Array.from(
                 new Map(allResults.map(item => [item.url, item])).values()
@@ -113,10 +122,14 @@ class BrochureService {
 
             // Rank and sort results
             const rankedResults = this.rankResults(uniqueResults, location);
+            logger.info('Results ranked and sorted', { 
+                uniqueResults: uniqueResults.length,
+                rankedResults: rankedResults.length 
+            });
 
             return rankedResults;
         } catch (error) {
-            console.error('Error searching location:', error);
+            logger.error('Error searching location:', error);
             throw error;
         }
     }
@@ -187,35 +200,20 @@ class BrochureService {
      */
     static async scrapeAndMergeUrls(urls) {
         try {
-            const scrapedData = [];
+            logger.info('Starting URL scraping', { urlCount: urls.length });
             
-            // Scrape each URL
-            for (const url of urls) {
-                try {
-                    const response = await axios.post(`${API_BASE_URL}/scrape/save`, {
-                        url,
-                        data: { source: 'brochure-generator' }
-                    });
-                    
-                    if (response.data.message === 'Data saved successfully') {
-                        scrapedData.push(url);
-                    }
-                } catch (error) {
-                    console.error(`Failed to scrape ${url}:`, error);
-                }
-            }
+            // Use WebScraperService to handle scraping
+            const scrapedData = await WebScraperService.scrapeAndEnsureUrls(urls);
+            logger.info('All URLs processed', { count: scrapedData.length });
 
-            // Get the list of all scraped files
-            const filesResponse = await axios.get(`${API_BASE_URL}/scrape/list`);
-            const relevantFiles = filesResponse.data.filter(filename => 
-                scrapedData.some(url => filename.includes(url.replace(/[^a-zA-Z0-9]/g, '_')))
-            );
+            // Merge the scraped data
+            logger.info('Starting data merge');
+            const mergedData = await this.mergeScrapedData(scrapedData);
+            logger.info('Data merge completed');
 
-            // Fetch and merge the data from each file
-            const mergedData = await this.mergeScrapedData(relevantFiles);
             return mergedData;
         } catch (error) {
-            console.error('Error scraping and merging URLs:', error);
+            logger.error('Error scraping and merging URLs:', error);
             throw error;
         }
     }
