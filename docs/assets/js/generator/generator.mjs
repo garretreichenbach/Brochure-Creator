@@ -1,1 +1,1 @@
-import{useState as t}from"https://unpkg.com/react@18/umd/react.production.min.js";import i from"https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js";
+import{useState as o}from"https://unpkg.com/react@18/umd/react.production.min.js";import m from"axios";
