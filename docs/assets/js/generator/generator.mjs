@@ -1,1 +1,1 @@
-import{useState as o}from"react";import r from"axios";
+import{useState as m}from"react";import o from"axios-min.js";
