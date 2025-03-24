@@ -1,1 +1,1 @@
-import{useState as o}from"https://unpkg.com/react@18/umd/react.production.min.js";import m from"axios";
+import{useState as o}from"react";import r from"axios";
