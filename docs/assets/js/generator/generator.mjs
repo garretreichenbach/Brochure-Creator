@@ -1,1 +1,1 @@
-import{useState as o}from"react.production.min.js";import i from"axios-min.js";
+import{useState as o}from"react.production.min.js";
