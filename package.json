@@ -2,12 +2,12 @@
   "name": "brochure-creator",
   "version": "1.0.0",
   "description": "Create customized brochures for locations in Super Mario Odyssey style using Google Gemini",
-  "main": "src/index.js",
+  "main": "srcold/index.js",
   "scripts": {
     "start": "npm run start-all",
     "start-all": "npm-run-all --parallel start-react start-express",
     "start-react": "cross-env PORT=3004 react-scripts start",
-    "start-express": "nodemon --config nodemon.json server/index.js",
+    "start-express": "nodemon --config nodemon.json srcold/server/index.js",
     "build": "react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject"
