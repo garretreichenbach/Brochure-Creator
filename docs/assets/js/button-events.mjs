@@ -1,0 +1,1 @@
+import{generateBrochure as e}from"./generator/generator.mjs";export function init(){document.getElementById("generate-button").addEventListener("click",e);document.getElementById("upload-button"),document.getElementById("theme-switcher-button"),document.getElementById("debug-panel-button")}

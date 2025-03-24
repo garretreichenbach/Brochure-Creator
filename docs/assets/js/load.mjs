@@ -1,0 +1,1 @@
+import*as t from"./button-events.mjs";var e=!1;window.addEventListener("load",(function(){const n=document.getElementById("upload-button");e?n.setAttribute("border-radius","0px"):n.setAttribute("border-radius","0px 10px 10px 0px"),document.getElementById("debug-panel-button").setAttribute("display",e?"block":"none"),t.init()}));
