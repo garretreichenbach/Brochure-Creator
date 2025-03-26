@@ -1,0 +1,1 @@
+import*as t from"https://cdn.jsdelivr.net/npm/react@18/umd/react.production.min.js";import*as r from"https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js";import e from"../data/brochure.mjs";import m from"../api/ai-handler.mjs";export default()=>{document.getElementById("page-content");return null};

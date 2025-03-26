@@ -1,0 +1,1 @@
+import*as t from"https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js";export default(t={"ai-endpoint":"http://192.168.1.197:3001"})=>{};
