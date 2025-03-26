@@ -1,0 +1,1 @@
+export class ScrapeData{constructor(t){this.source=t.source,this.title=t.title,this.author=t.author,this.uuid=t.uuid,this.scraped=t.scraped,this.published=t.published,this.ranking=t.ranking,this.tags=t.tags,this.content=t.content,this.images=t.images}}

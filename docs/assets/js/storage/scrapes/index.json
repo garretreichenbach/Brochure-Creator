@@ -1,0 +1,1 @@
+{"scrapes":{"scrape_1":{"source":"http://example.com","title":"Example","author":"Author","uuid":"12345678-1234-1234-1234-123456789012","scraped":"2018-01-01T00:00:00Z","published":"2018-01-01T00:00:00Z","type":"official","ranking":10,"tags":["tag1","tag2"],"content":"This is an example.","images":["http://example.com/image1.jpg","http://example.com/image2.jpg"]}}}
